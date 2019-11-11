@@ -66,6 +66,82 @@ struct header_s get_header(const char *str, uint_fast16_t len)
 		.yzero = 0
 	};
 
+	/* TODO: len currently unused, but may allow for buffer overrun
+	 * mitigations in the future. */
+	(void) len;
+
+	/* NR_PT */
+	{
+		const char needle[] = "NR_PT ";
+		char *loc;
+		char *endptr;
+
+		loc = strstr(str, needle);
+		assert(loc != NULL);
+		loc += strlen(needle);
+
+		h.points = strtol(loc, &endptr, 10);
+		assert(endptr[0] == ';');
+	}
+
+	/* BYT_NR */
+	{
+		const char needle[] = "BYT_NR ";
+		char *loc;
+		char *endptr;
+
+		loc = strstr(str, needle);
+		assert(loc != NULL);
+		loc += strlen(needle);
+
+		h.width = strtol(loc, &endptr, 10);
+		assert(endptr[0] == ';');
+	}
+
+	/* ENCDG */
+	{
+		const char needle[] = "ENCDG ";
+		char *loc;
+
+		loc = strstr(str, needle);
+		assert(loc != NULL);
+		loc += strlen(needle);
+
+		switch(*loc)
+		{
+		case 'B':
+			h.enc = ENC_BINARY;
+			break;
+		case 'A':
+			h.enc = ENC_ASCII;
+			break;
+		default:
+			h.enc = ENC_UNKNOWN;
+		}
+	}
+
+	/* WFID */
+	{
+		const char needle[] = "WFID \"";
+		char *loc;
+		char *info_str;
+		char *loc_cpy;
+
+		loc = strstr(str, needle);
+		assert(loc != NULL);
+		loc += strlen(needle);
+
+		/* Since str is a const, we must copy the string before
+		 * modifying it. */
+		loc_cpy = strdup(loc);
+		info_str = strtok(loc_cpy, "\"");
+		assert(info_str != NULL);
+
+		h.info_str = strdup(info_str);
+
+		free(loc_cpy);
+	}
+
 	/* YMULT */
 	{
 		const char needle[] = "YMULT ";
@@ -101,6 +177,7 @@ struct header_s get_header(const char *str, uint_fast16_t len)
 int main(int argc, char *argv[])
 {
 	FILE *f;
+	int ret = EXIT_FAILURE;
 
 	if(argc != 2)
 	{
@@ -121,8 +198,28 @@ int main(int argc, char *argv[])
 
 	const uint_fast16_t h_len = get_header_length(buf);
 	struct header_s h = get_header(buf, h_len);
+
+	fprintf(stderr, "INFO: %s\n", h.info_str);
+	fflush(stderr);
 	
+	if(h.width != 2)
+	{
+		fprintf(stderr, "Only width of 2 is supported. Was %d.\n",
+				h.width);
+		goto err;
+	}
+
+	if(h.enc != ENC_BINARY)
+	{
+		fprintf(stderr, "Only binary encoding is supported. Was %d.\n",
+				h.enc);
+		goto err;
+	}
+
+	/* Seek to first data point. */
 	fseek(f, h_len, SEEK_SET);
+
+	/* Temporary buffer for binary data. */
 	uint16_t bin[2048];
 	size_t elem = fread(bin, sizeof(uint16_t), sizeof(bin)/sizeof(*bin), f);
 
@@ -133,8 +230,10 @@ int main(int argc, char *argv[])
 		elem = fread(bin, sizeof(uint16_t), sizeof(bin)/sizeof(*bin), f);
 	} while(elem != 0);
 
-	fclose(f);
+	ret = EXIT_SUCCESS;
 
-	return EXIT_SUCCESS;
+err:
+	fclose(f);
+	return ret;
 }
 #endif
