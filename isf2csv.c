@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#define _GNU_SOURCE
 #include <assert.h>
 #include <errno.h>
 #include <stdint.h>
@@ -177,11 +178,33 @@ struct header_s get_header(const char *str, uint_fast16_t len)
 int main(int argc, char *argv[])
 {
 	FILE *f;
+	FILE *out;
 	int ret = EXIT_FAILURE;
 
-	if(argc != 2)
+	switch(argc)
 	{
-		printf("%s ISF\n", argv[0]);
+	case 2:
+		/* Construct output filename. */
+		{
+			char *out_name;
+
+			assert(asprintf(&out_name, "%s.csv", argv[1]) != -1);
+			assert((out = fopen(out_name, "wb")) != NULL);
+			free(out_name);
+		}
+		break;
+
+	case 3:
+		/* Print to stdout instead of saving to file. */
+		out = stdout;
+		/* If second parameter isn't a dash, printf help and exit. */
+		if(strcmp(argv[2], "-") == 0)
+			break;
+
+		/* Intentional fall-through */
+
+	default:
+		printf("%s ISF [-]\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 
@@ -216,6 +239,7 @@ int main(int argc, char *argv[])
 		goto err;
 	}
 
+
 	/* Seek to first data point. */
 	fseek(f, h_len, SEEK_SET);
 
@@ -225,11 +249,12 @@ int main(int argc, char *argv[])
 
 	do {
 		for(size_t i = 0; i < elem; i++)
-			printf("%g\n", isf2csv(bin[i], h.ymult, h.yzero));
+			fprintf(out, "%g\n", isf2csv(bin[i], h.ymult, h.yzero));
 
 		elem = fread(bin, sizeof(uint16_t), sizeof(bin)/sizeof(*bin), f);
 	} while(elem != 0);
 
+	fclose(out);
 	ret = EXIT_SUCCESS;
 
 err:
