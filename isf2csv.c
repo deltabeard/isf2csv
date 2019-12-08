@@ -20,16 +20,17 @@
 #define _GNU_SOURCE
 #include <assert.h>
 #include <errno.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "isf2csv.h"
 
-double isf2csv(const int16_t sample, const double ymult, const double yzero)
+double isf2csv(const int16_t sample, const struct header_s *h)
 {
-	double ret = ((int16_t)__builtin_bswap16(sample) * ymult) + yzero;
+	double ret = h->yzero +
+		h->ymult * ((int16_t)__builtin_bswap16(sample) - h->yoff);
 	return ret;
 }
 
@@ -171,6 +172,20 @@ struct header_s get_header(const char *str, uint_fast16_t len)
 		assert(endptr[0] == ';');
 	}
 
+	/* YOFF */
+	{
+		const char needle[] = "YOFF ";
+		char *loc;
+		char *endptr;
+
+		loc = strstr(str, needle);
+		assert(loc != NULL);
+		loc += strlen(needle);
+
+		h.yoff = strtod(loc, &endptr);
+		assert(endptr[0] == ';');
+	}
+
 	return h;
 }
 
@@ -223,6 +238,9 @@ int main(int argc, char *argv[])
 	struct header_s h = get_header(buf, h_len);
 
 	fprintf(stderr, "INFO: %s\n", h.info_str);
+	fprintf(stderr, "POINTS:%" PRIuFAST32 ", WIDTH:%" PRIuFAST8 ", "
+			"ENC:%d, YMULT:%g, YZERO:%g\n",
+			h.points, h.width, h.enc, h.ymult, h.yzero);
 	fflush(stderr);
 	
 	if(h.width != 2)
@@ -239,7 +257,6 @@ int main(int argc, char *argv[])
 		goto err;
 	}
 
-
 	/* Seek to first data point. */
 	fseek(f, h_len, SEEK_SET);
 
@@ -249,7 +266,7 @@ int main(int argc, char *argv[])
 
 	do {
 		for(size_t i = 0; i < elem; i++)
-			fprintf(out, "%g\n", isf2csv(bin[i], h.ymult, h.yzero));
+			fprintf(out, "%g\n", isf2csv(bin[i], &h));
 
 		elem = fread(bin, sizeof(uint16_t), sizeof(bin)/sizeof(*bin), f);
 	} while(elem != 0);

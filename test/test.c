@@ -11,16 +11,18 @@ void t_wav_check(void)
 		0x000e, 0x000a, 0x0007, 0x0002,
 		0x00ff, 0x00fa, 0x00f7, 0x00f4
 	};
-
-	double ymult = 156.25e-6;
-
 	double expected[] = {
 		0.5600, 0.4000, 0.2800, 0.0800,
 		-0.0400, -0.2400, -0.3600, -0.4800
 	};
+	struct header_s h = {
+		.ymult = 156.25e-6,
+		.yzero = 0.0,
+		.yoff = 0.0
+	};
 
 	for(uint_fast32_t i = 0; i < sizeof(wave)/sizeof(*wave); i++)
-		lfequal(isf2csv(wave[i], ymult, 0.0f), expected[i]);
+		lfequal(isf2csv(wave[i], &h), expected[i]);
 }
 
 void t_hl_check(void)
