@@ -27,10 +27,18 @@
 
 #include "isf2csv.h"
 
-double isf2csv(const int16_t sample, const struct header_s *h)
+double isf2csv(int16_t sample, const struct header_s *h)
 {
-	double ret = h->yzero +
-		h->ymult * ((int16_t)__builtin_bswap16(sample) - h->yoff);
+	double ret;
+
+#ifdef _MSC_VER
+	sample = _byteswap_ushort(sample);
+#else
+	sample = (int16_t)__builtin_bswap16(sample);
+#endif
+
+	ret = h->yzero +
+		h->ymult * ((double)sample - h->yoff);
 	return ret;
 }
 
@@ -201,10 +209,21 @@ int main(int argc, char *argv[])
 	case 2:
 		/* Construct output filename. */
 		{
+			char *in_name = argv[1];
 			char *out_name;
+			size_t in_name_len;
+			size_t out_name_len;
 
-			assert(asprintf(&out_name, "%s.csv", argv[1]) != -1);
-			assert((out = fopen(out_name, "wb")) != NULL);
+			in_name_len = strlen(in_name);
+			out_name_len = in_name_len + sizeof(".csv");
+			out_name = malloc(out_name_len);
+			assert(out_name != NULL);
+
+			strcpy(out_name, in_name);
+			strcat(out_name, ".csv");
+			out = fopen(out_name, "wb");
+
+			assert(out != NULL);
 			free(out_name);
 		}
 		break;

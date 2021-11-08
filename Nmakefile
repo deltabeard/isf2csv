@@ -1,0 +1,4 @@
+CFLAGS = /nologo /O2
+
+all: isf2csv.exe
+isf2csv.exe: isf2csv.c
