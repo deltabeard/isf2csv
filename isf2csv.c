@@ -285,7 +285,7 @@ int main(int argc, char *argv[])
 
 	do {
 		for(size_t i = 0; i < elem; i++)
-			fprintf(out, "%g\n", isf2csv(bin[i], &h));
+			fprintf(out, "%.9g\n", isf2csv(bin[i], &h));
 
 		elem = fread(bin, sizeof(uint16_t), sizeof(bin)/sizeof(*bin), f);
 	} while(elem != 0);
